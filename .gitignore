@@ -1,1 +1,1 @@
-Nothing should be ignored based on the provided file changes, as they consist only of source/config files (.md, .py, .html) without any build artifacts, dependencies, or temporary files.
+(debug_firewall.py is a source file, so no need to ignore it)
