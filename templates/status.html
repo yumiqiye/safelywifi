@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>等待审核</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+        h2 { color: #ff9800; }
+        p { color: #666; line-height: 1.6; }
+        .status-box { background: #fff3e0; border: 1px solid #ffe0b2; padding: 1rem; border-radius: 4px; margin: 1.5rem 0; }
+        .btn { display: inline-block; padding: 0.75rem 1.5rem; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; margin-top: 1rem; }
+        .refresh { animation: spin 2s linear infinite; display: inline-block; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>⏳ 等待审核</h2>
+        <p>您的账号 <strong>{{ user.username }}</strong> 已提交申请。</p>
+        
+        <div class="status-box">
+            <p>当前状态：<strong>待管理员审核</strong></p>
+            <p style="font-size: 0.9rem; color: #888;">
+                IP: {{ user.ip_address }}<br>
+                MAC: {{ user.mac_address }}
+            </p>
+        </div>
+
+        <p>请联系网络管理员进行审批，审批通过后刷新页面即可上网。</p>
+        
+        <a href="/status" class="btn">🔄 刷新状态</a>
+        <br>
+        <a href="/logout" style="display:block; margin-top:1rem; color:#666; font-size:0.9rem;">退出登录</a>
+    </div>
+
+    <!-- 自动每 5 秒刷新一次 -->
+    <script>
+        setTimeout(function(){
+            location.reload();
+        }, 5000);
+    </script>
+</body>
+</html>

@@ -3,46 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wi-Fi 身份认证</title>
+    <title>Wi-Fi 认证登录</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .container { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 320px; text-align: center; }
-        h2 { color: #333; margin-bottom: 1.5rem; }
-        .info { background: #e6f7ff; border: 1px solid #91d5ff; padding: 10px; border-radius: 5px; font-size: 0.9em; color: #1890ff; margin-bottom: 15px; text-align: left; }
-        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background: #1890ff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; transition: background 0.3s; }
-        button:hover { background: #40a9ff; }
-        .message { margin-top: 15px; font-weight: bold; }
-        .success { color: #52c41a; }
-        .error { color: #ff4d4f; }
-        .warning { color: #faad14; }
+        .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        h2 { text-align: center; color: #333; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; color: #666; }
+        input[type="text"], input[type="password"] { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 0.75rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+        button:hover { background: #0056b3; }
+        .flash { background: #ffebee; color: #c62828; padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem; text-align: center; }
+        .info { background: #e3f2fd; color: #1565c0; padding: 0.75rem; border-radius: 4px; margin-top: 1rem; font-size: 0.9rem; text-align: center; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Wi-Fi 身份认证</h2>
+        <h2>📶 Wi-Fi 认证</h2>
+        
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="flash">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form action="/login" method="POST">
+            <div class="form-group">
+                <label for="username">账号</label>
+                <input type="text" id="username" name="username" required placeholder="请输入账号">
+            </div>
+            <div class="form-group">
+                <label for="password">密码</label>
+                <input type="password" id="password" name="password" required placeholder="请输入密码">
+            </div>
+            <!-- 隐藏字段用于传递 MAC (实际项目中可通过 JS 获取或后端解析) -->
+            <input type="hidden" name="mac" id="macAddress" value="Unknown">
+            <button type="submit">登录</button>
+        </form>
         
         <div class="info">
-            <div><strong>MAC 地址:</strong> {{ mac }}</div>
-            <div><strong>IP 地址:</strong> {{ ip }}</div>
+            <p>首次登录将自动提交申请，等待管理员审核。</p>
+            <p id="ip-info"></p>
         </div>
-
-        {% if success %}
-            <div class="message success">{{ success }}</div>
-            <p>您现在可以访问互联网了。</p>
-        {% elif message %}
-            <div class="message warning">{{ message }}</div>
-        {% elif error %}
-            <div class="message error">{{ error }}</div>
-        {% else %}
-            <form action="/login" method="POST">
-                <input type="text" name="username" placeholder="请输入账号" required>
-                <input type="password" name="password" placeholder="请输入密码" required>
-                <button type="submit">登录并申请上网</button>
-            </form>
-        {% endif %}
-        
-        <p style="font-size: 12px; color: #999; margin-top: 20px;">Powered by Huawei Auth System</p>
     </div>
+
+    <script>
+        // 简单显示 IP
+        document.getElementById('ip-info').innerText = "您的 IP: {{ request.remote_addr }}";
+    </script>
 </body>
 </html>

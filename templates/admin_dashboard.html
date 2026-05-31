@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理后台 - 用户审核</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f6fa; margin: 0; padding: 2rem; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h2 { color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; color: #666; font-weight: 600; }
+        .status-pending { color: #ff9800; font-weight: bold; }
+        .status-approved { color: #4caf50; font-weight: bold; }
+        .status-rejected { color: #f44336; font-weight: bold; }
+        .btn { padding: 0.5rem 1rem; border-radius: 4px; text-decoration: none; font-size: 0.9rem; border: none; cursor: pointer; }
+        .btn-approve { background: #4caf50; color: white; }
+        .btn-reject { background: #f44336; color: white; }
+        .btn-export { background: #2196f3; color: white; float: right; }
+        .btn-logout { background: #6c757d; color: white; float: right; margin-right: 1rem; }
+        .flash { background: #e8f5e9; color: #2e7d32; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; }
+        tr:hover { background: #fafafa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🛡️ 用户审核管理</h2>
+        
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="flash">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div style="overflow: hidden; margin-bottom: 1rem;">
+            <a href="/admin/export" class="btn btn-export">📥 导出白名单 CSV</a>
+            <a href="/admin/logout" class="btn btn-logout">退出登录</a>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>账号</th>
+                    <th>MAC 地址</th>
+                    <th>IP 地址</th>
+                    <th>状态</th>
+                    <th>申请时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.username }}</td>
+                    <td><code>{{ user.mac_address }}</code></td>
+                    <td>{{ user.ip_address }}</td>
+                    <td>
+                        {% if user.status == 'pending' %}
+                            <span class="status-pending">待审核</span>
+                        {% elif user.status == 'approved' %}
+                            <span class="status-approved">已通过</span>
+                        {% else %}
+                            <span class="status-rejected">已拒绝</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ user.created_at }}</td>
+                    <td>
+                        {% if user.status == 'pending' %}
+                            <a href="/admin/approve/{{ user.id }}" class="btn btn-approve">通过</a>
+                            <a href="/admin/reject/{{ user.id }}" class="btn btn-reject">拒绝</a>
+                        {% else %}
+                            <span style="color: #ccc;">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        {% if not users %}
+        <p style="text-align: center; color: #999; padding: 2rem;">暂无用户申请</p>
+        {% endif %}
+    </div>
+</body>
+</html>
