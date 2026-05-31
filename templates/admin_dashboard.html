@@ -40,6 +40,15 @@
             <a href="/admin/logout" class="btn btn-logout">退出登录</a>
         </div>
 
+        <div style="background: #e3f2fd; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; font-size: 0.9rem;">
+            <strong>💡 自动拦截/放行说明：</strong><br>
+            • 系统会自动扫描连接到热点的设备<br>
+            • <span class="status-pending">待审核</span> 设备：只能访问认证页面，无法访问外网<br>
+            • <span class="status-approved">已通过</span> 设备：自动移除防火墙阻止规则，可正常上网<br>
+            • <span class="status-rejected">已拒绝</span> 设备：自动添加防火墙阻止规则，禁止访问外网<br>
+            <strong>注意：</strong>需要以管理员身份运行本程序才能修改防火墙规则
+        </div>
+
         <table>
             <thead>
                 <tr>
