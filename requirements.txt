@@ -1,0 +1,2 @@
+flask
+# requests  # 如果需要调用真实的华为 API，请取消注释
