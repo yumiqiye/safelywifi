@@ -13,6 +13,8 @@
         .btn { display: inline-block; padding: 0.75rem 1.5rem; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; margin-top: 1rem; }
         .refresh { animation: spin 2s linear infinite; display: inline-block; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .blocked-notice { background: #ffebee; color: #c62828; padding: 0.75rem; border-radius: 4px; margin: 1rem 0; font-size: 0.9rem; }
+        .allowed-notice { background: #e8f5e9; color: #2e7d32; padding: 0.75rem; border-radius: 4px; margin: 1rem 0; font-size: 0.9rem; }
     </style>
 </head>
 <body>
@@ -26,6 +28,11 @@
                 IP: {{ user.ip_address }}<br>
                 MAC: {{ user.mac_address }}
             </p>
+        </div>
+
+        <div class="blocked-notice">
+            🔒 您目前只能访问认证页面，无法访问外网。<br>
+            管理员审批通过后将自动放行。
         </div>
 
         <p>请联系网络管理员进行审批，审批通过后刷新页面即可上网。</p>

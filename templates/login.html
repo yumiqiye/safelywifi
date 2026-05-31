@@ -50,8 +50,12 @@
     </div>
 
     <script>
-        // 简单显示 IP
+        // 显示 IP 信息
         document.getElementById('ip-info').innerText = "您的 IP: {{ request.remote_addr }}";
+        
+        // 尝试获取 MAC 地址（注意：浏览器无法直接获取真实 MAC，这里仅作占位）
+        // 实际 MAC 地址需要通过后端从 ARP 表或其他系统接口获取
+        // 在热点场景下，服务器可以通过扫描连接设备来获取 MAC
     </script>
 </body>
 </html>
