@@ -1,119 +1,206 @@
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
+import sqlite3
 import os
-import socket
-import threading
-from flask import Flask, request, render_template, redirect, url_for, jsonify
-from datetime import datetime
+import datetime
+import csv
+import io
 
 app = Flask(__name__)
+app.secret_key = 'wifi_auth_secret_key_change_this_in_prod'
 
-# --- 配置区域 ---
-# 华为路由器/控制器 API 配置 (需要根据实际型号修改，如 NCE-Campus 或 AC6005)
-HUAWEI_CONTROLLER_URL = "https://192.168.1.1:8443" 
-HUAWEI_API_TOKEN = "your_api_token_here"
+# 数据库配置
+DB_PATH = 'users.db'
 
-# 内存数据库 (生产环境请替换为 SQLite/MySQL)
-# 状态: 'pending' (待审核), 'approved' (已通过), 'rejected' (拒绝)
-users_db = {} 
-
-# --- 辅助函数：获取用户 MAC 地址 ---
-def get_user_mac():
-    """
-    尝试从 HTTP 头或 ARP 表中获取用户 MAC。
-    注意：在真实环境中，通常需要路由器在重定向时通过 URL 参数传递 MAC (如 ?mac=xx:xx:xx)。
-    这里做模拟处理。
-    """
-    # 模拟：如果路由器配置了 URL 重定向带参数，从这里取
-    mac = request.args.get('mac', 'unknown-mac')
-    if mac == 'unknown-mac':
-        # 仅作为演示，真实环境很难直接从HTTP获取MAC，需依靠路由器透传
-        mac = f"MAC-{socket.gethostbyname(socket.gethostname())}" 
-    return mac
-
-# --- 辅助函数：调用华为路由器 API ---
-def authorize_user_huawei(mac_address, ip_address):
-    """
-    调用华为路由器 API 将用户加入白名单。
-    此处为伪代码，需根据具体华为设备型号 (AC/AP/网关) 的 API 文档实现。
-    """
-    print(f"[System] 正在向华为设备发送授权指令: MAC={mac_address}, IP={ip_address}")
+def init_db():
+    """初始化数据库"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    # 用户表：账号，密码，MAC地址，IP地址，状态(pending/approved/rejected)，申请时间
+    c.execute('''CREATE TABLE IF NOT EXISTS users
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  username TEXT UNIQUE,
+                  password TEXT,
+                  mac_address TEXT,
+                  ip_address TEXT,
+                  status TEXT DEFAULT 'pending',
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # 示例：如果是华为 NCE-Campus，通常发送 REST API 请求
-    # payload = {"mac": mac_address, "action": "allow"}
-    # requests.post(f"{HUAWEI_CONTROLLER_URL}/api/v1/users/authorize", json=payload, headers=...)
+    # 创建默认管理员 (superadmin / root)
+    try:
+        c.execute("INSERT INTO users (username, password, status) VALUES (?, ?, ?)", 
+                  ('superadmin', 'root', 'approved'))
+        # 创建普通测试账号 (admin / admin123) - 模拟自动通过
+        c.execute("INSERT INTO users (username, password, status) VALUES (?, ?, ?)", 
+                  ('admin', 'admin123', 'approved'))
+    except sqlite3.IntegrityError:
+        pass # 已存在
     
-    # 模拟成功
-    return True
+    conn.commit()
+    conn.close()
 
-# --- 路由：用户登录页 ---
+def get_db_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
 @app.route('/')
-def login_page():
-    user_mac = get_user_mac()
-    user_ip = request.remote_addr
-    return render_template('login.html', mac=user_mac, ip=user_ip)
+def login():
+    if 'user_id' in session:
+        return redirect(url_for('status'))
+    return render_template('login.html')
 
-# --- 路由：处理登录提交 ---
 @app.route('/login', methods=['POST'])
-def login_submit():
+def do_login():
     username = request.form.get('username')
     password = request.form.get('password')
-    user_mac = get_user_mac()
+    # 获取客户端简易信息 (实际生产环境可能需要更复杂的获取方式)
     user_ip = request.remote_addr
-    
-    # 简单验证逻辑
+    user_mac = request.form.get('mac', 'Unknown') 
+
     if not username or not password:
-        return redirect(url_for('login_page', error="请输入账号密码"))
+        flash('请输入账号和密码')
+        return redirect(url_for('login'))
 
-    # 策略判断：
-    # 1. 如果是特定管理员账号，直接通过
-    # 2. 否则，进入待审核状态 (pending)，等待后台手动通过
-    
-    if username == "admin" and password == "admin123":
-        # 自动通过
-        authorize_user_huawei(user_mac, user_ip)
-        return render_template('login.html', success="管理员登录成功，已放行！", mac=user_mac)
-    
-    # 普通用户：存入数据库，状态为 pending
-    users_db[username] = {
-        "password": password,
-        "mac": user_mac,
-        "ip": user_ip,
-        "status": "pending",
-        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-    
-    return render_template('login.html', message="您的申请已提交，请等待管理员审核。", mac=user_mac)
+    conn = get_db_connection()
+    user = conn.execute('SELECT * FROM users WHERE username = ? AND password = ?', (username, password)).fetchone()
 
-# --- 路由：管理后台 ---
-@app.route('/admin')
-def admin_panel():
-    # 简单的硬编码密码保护
-    auth = request.authorization
-    if not auth or not (auth.username == "superadmin" and auth.password == "root"):
-        return redirect(url_for('login_page')) # 或者返回 401
+    if user:
+        session['user_id'] = user['id']
+        session['username'] = user['username']
         
-    return render_template('admin.html', users=users_db)
+        # 更新 IP 和 MAC (如果之前没有)
+        if user['mac_address'] == 'Unknown' or not user['mac_address']:
+             conn.execute('UPDATE users SET mac_address = ?, ip_address = ? WHERE id = ?', 
+                         (user_mac, user_ip, user['id']))
+             conn.commit()
 
-# --- 路由：管理员手动通过 ---
-@app.route('/approve/<username>', methods=['POST'])
-def approve_user(username):
-    if username in users_db:
-        users_db[username]['status'] = 'approved'
-        # 调用华为设备接口放行
-        authorize_user_huawei(users_db[username]['mac'], users_db[username]['ip'])
-        return jsonify({"success": True, "message": f"用户 {username} 已放行"})
-    return jsonify({"success": False, "message": "用户不存在"})
+        conn.close()
+        
+        if user['status'] == 'approved':
+            return redirect(url_for('success'))
+        else:
+            return redirect(url_for('status'))
+    else:
+        # 尝试注册/申请逻辑：如果用户不存在，自动创建为 pending 状态
+        try:
+            conn = get_db_connection()
+            conn.execute('INSERT INTO users (username, password, mac_address, ip_address, status) VALUES (?, ?, ?, ?, ?)',
+                         (username, password, user_mac, user_ip, 'pending'))
+            conn.commit()
+            conn.close()
+            session['username'] = username
+            # 这里简化处理，新注册用户直接跳转到等待页
+            return redirect(url_for('status'))
+        except sqlite3.IntegrityError:
+            flash('账号或密码错误，且无法自动注册（可能账号已存在但密码不同）')
+            return redirect(url_for('login'))
 
-# --- 路由：管理员拒绝 ---
-@app.route('/reject/<username>', methods=['POST'])
-def reject_user(username):
-    if username in users_db:
-        users_db[username]['status'] = 'rejected'
-        return jsonify({"success": True, "message": f"用户 {username} 已拒绝"})
-    return jsonify({"success": False, "message": "用户不存在"})
+@app.route('/status')
+def status():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    user = conn.execute('SELECT * FROM users WHERE id = ?', (session['user_id'],)).fetchone()
+    conn.close()
+    
+    if not user:
+        session.clear()
+        return redirect(url_for('login'))
+        
+    return render_template('status.html', user=user)
+
+@app.route('/success')
+def success():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('success.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+# --- 管理后台 ---
+
+@app.route('/admin')
+def admin():
+    # 简单鉴权
+    if 'admin_logged_in' not in session or not session['admin_logged_in']:
+        return render_template('admin_login.html')
+    
+    conn = get_db_connection()
+    users = conn.execute('SELECT * FROM users ORDER BY created_at DESC').fetchall()
+    conn.close()
+    return render_template('admin_dashboard.html', users=users)
+
+@app.route('/admin/login', methods=['POST'])
+def admin_login():
+    username = request.form.get('username')
+    password = request.form.get('password')
+    
+    # 硬编码超级管理员，实际可放入数据库
+    if username == 'superadmin' and password == 'root':
+        session['admin_logged_in'] = True
+        return redirect(url_for('admin'))
+    else:
+        flash('管理员账号或密码错误')
+        return redirect(url_for('admin'))
+
+@app.route('/admin/approve/<int:user_id>')
+def approve_user(user_id):
+    if 'admin_logged_in' not in session:
+        return redirect(url_for('admin'))
+    
+    conn = get_db_connection()
+    conn.execute('UPDATE users SET status = ? WHERE id = ?', ('approved', user_id))
+    conn.commit()
+    conn.close()
+    flash('用户已批准！请在路由器上将对应 MAC 地址加入白名单。')
+    return redirect(url_for('admin'))
+
+@app.route('/admin/reject/<int:user_id>')
+def reject_user(user_id):
+    if 'admin_logged_in' not in session:
+        return redirect(url_for('admin'))
+    
+    conn = get_db_connection()
+    conn.execute('UPDATE users SET status = ? WHERE id = ?', ('rejected', user_id))
+    conn.commit()
+    conn.close()
+    flash('用户已拒绝')
+    return redirect(url_for('admin'))
+
+@app.route('/admin/export')
+def export_csv():
+    if 'admin_logged_in' not in session:
+        return redirect(url_for('admin'))
+    
+    conn = get_db_connection()
+    users = conn.execute("SELECT username, mac_address, ip_address, status, created_at FROM users WHERE status = 'approved'").fetchall()
+    conn.close()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Username', 'MAC Address', 'IP Address', 'Status', 'Approved Time'])
+    
+    for user in users:
+        writer.writerow([user['username'], user['mac_address'], user['ip_address'], user['status'], user['created_at']])
+    
+    output.seek(0)
+    return send_file(
+        io.BytesIO(output.getvalue().encode('utf-8')),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name=f'whitelist_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+    )
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('admin_logged_in', None)
+    return redirect(url_for('admin'))
 
 if __name__ == '__main__':
-    # 监听所有网卡，端口 80 (Linux可能需要sudo) 或 8080
-    port = int(os.environ.get("PORT", 8080))
-    print(f"启动认证服务器，监听端口 {port}...")
-    print(f"管理后台地址: http://localhost:{port}/admin (账号: superadmin / root)")
-    app.run(host='0.0.0.0', port=port, debug=True)
+    init_db()
+    # host='0.0.0.0' 允许局域网访问
+    app.run(host='0.0.0.0', port=8080, debug=True)

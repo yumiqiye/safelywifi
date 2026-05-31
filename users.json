@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "username": "superadmin",
+    "password": "root",
+    "mac_address": "",
+    "ip_address": "",
+    "status": "approved",
+    "created_at": "2026-05-31 09:33:33"
+  },
+  {
+    "id": 2,
+    "username": "admin",
+    "password": "admin123",
+    "mac_address": "",
+    "ip_address": "",
+    "status": "approved",
+    "created_at": "2026-05-31 09:33:33"
+  },
+  {
+    "id": 3,
+    "username": "testuser",
+    "password": "testpass",
+    "mac_address": "Unknown",
+    "ip_address": "127.0.0.1",
+    "status": "pending",
+    "created_at": "2026-05-31 09:35:59"
+  }
+]

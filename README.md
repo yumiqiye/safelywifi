@@ -1,81 +1,138 @@
-# Wi-Fi 认证系统 (适配华为路由器)
+# Wi-Fi 认证程序 (无需 API 版本)
 
-这是一个基于 Python Flask 的 Portal 认证系统，支持用户输入账号密码登录，管理员后台手动审核通过后，调用华为路由器 API 放行用户上网。
+一个适用于 Windows/Linux 的轻量级 Wi-Fi 认证系统，专为华为路由器环境设计。**不需要路由器 API**，采用"手动放行"模式。
 
-## 功能特点
-- **用户登录页**：美观的响应式登录界面，自动获取用户 MAC/IP。
-- **自动/手动策略**：
-  - 管理员账号 (`admin`/`admin123`) 登录自动放行。
-  - 普通用户登录后进入“待审核”状态。
-- **管理后台**：
-  - 地址：`/admin` (账号: `superadmin` / 密码: `root`)
-  - 可查看申请列表，手动点击“通过”或“拒绝”。
-  - “通过”后自动调用华为设备接口放行。
-- **跨平台**：适用于 Windows 和 Linux。
+## 📖 项目说明
 
-## 目录结构
-```
-/workspace
-├── app.py              # 主程序
-├── templates/
-│   ├── login.html      # 用户登录页
-│   └── admin.html      # 管理后台页
-├── requirements.txt    # 依赖包
-└── README.md           # 说明文档
-```
+本程序提供一个 Web 认证页面，用户输入账号密码登录后进入"待审核"状态。管理员在后台审核通过后，**手动将用户的 MAC 地址添加到华为路由器的白名单中**，用户即可访问互联网。
 
-## 安装步骤
+### 工作流程
+1. 用户连接 Wi-Fi，打开浏览器自动跳转到认证页
+2. 用户输入账号密码提交
+3. 系统记录用户信息（账号、密码、MAC、IP），状态设为"待审核"
+4. 管理员登录后台 `/admin`，查看待审核用户
+5. 管理员点击"通过"，系统提示需要手动操作
+6. **管理员登录华为路由器，将用户的 MAC 地址加入白名单/允许列表**
+7. 用户刷新页面，显示认证成功，可以上网
 
-### 1. 安装依赖
-确保已安装 Python 3。
+## 🚀 快速开始
+
+### 安装依赖
 ```bash
-pip install flask
-# 如果需要调用真实的华为 API，还需安装 requests
-# pip install requests
+pip install -r requirements.txt
 ```
 
-### 2. 运行程序
+### 运行程序
 ```bash
 python app.py
 ```
-默认监听端口 **8080**。
-- 用户访问：`http://<服务器IP>:8080`
-- 管理后台：`http://<服务器IP>:8080/admin`
 
-### 3. 华为路由器配置 (关键步骤)
-为了让用户连接 Wi-Fi 后自动跳转到此页面，需要在华为路由器/AC 上配置 **Portal 认证** 或 **重定向规则**。
+服务启动后：
+- **用户登录页**: `http://<服务器IP>:8080`
+- **管理后台**: `http://<服务器IP>:8080/admin`
 
-#### 方案 A：使用华为 AC/网关的内置 Portal 服务器 (推荐)
-如果华为设备支持自定义 Portal 页面，将 `login.html` 的内容上传至设备，并配置认证模板指向本系统的 API 接口（需二次开发对接设备内部逻辑）。
+### 默认账号
 
-#### 方案 B：旁挂式认证 (本代码适用场景)
-1. **防火墙/流控策略**：默认阻断所有 Wi-Fi 客户端的互联网访问，但放行对本认证服务器 (8080 端口) 的访问。
-2. **DNS 劫持/重定向**：配置路由器将所有 HTTP 请求 (80 端口) 重定向到 `http://<服务器IP>:8080`。
-   - *注：部分华为设备支持 `redirect` 命令或 ACL 重定向。*
-3. **联动放行**：
-   - 当管理员在后台点击“通过”时，代码中的 `authorize_user_huawei` 函数会被触发。
-   - **你需要在此处填入真实的华为 API 调用代码**。
-   - 常见方式：
-     - **SNMP**: 修改交换机 ACL。
-     - **REST API**: 华为 NCE-Campus 或 AR 路由器网管接口。
-     - **SSH/Telnet**: 脚本登录设备执行命令行 (如 `acl permit mac xxxx`)。
+#### 超级管理员（审核后台）
+- 账号：`superadmin`
+- 密码：`root`
 
-## 代码定制指南
-打开 `app.py`，找到 `authorize_user_huawei` 函数：
+#### 测试用户（已自动通过）
+- 账号：`admin`
+- 密码：`admin123`
 
-```python
-def authorize_user_huawei(mac_address, ip_address):
-    # TODO: 替换为真实的华为设备 API 调用
-    # 示例 (伪代码):
-    # import requests
-    # url = "https://192.168.1.1:8443/api/v1/users/allow"
-    # data = {"mac": mac_address}
-    # requests.post(url, json=data, auth=('admin', 'password'))
-    print(f"放行用户: {mac_address}")
-    return True
+## 📁 文件结构
+```
+/workspace
+├── app.py                 # 主程序 (Flask 后端)
+├── templates/             # HTML 模板
+│   ├── login.html         # 用户登录页
+│   ├── status.html        # 等待审核页
+│   ├── success.html       # 认证成功页
+│   ├── admin_login.html   # 管理员登录页
+│   └── admin_dashboard.html # 管理后台
+├── users.db               # SQLite 数据库 (自动生成)
+├── requirements.txt       # Python 依赖
+└── README.md              # 本文件
 ```
 
-## 安全提示
-1. 生产环境请务必修改默认的管理员密码 (`superadmin`/`root`) 和测试账号 (`admin`/`admin123`)。
-2. 建议将内存数据库 (`users_db`) 替换为 SQLite 或 MySQL 以持久化数据。
-3. 部署在 Linux 上如需使用 80 端口，请使用 `sudo` 或通过 Nginx 反向代理。
+## ⚙️ 华为路由器配置指南
+
+由于没有 API，需要在华为路由器上**手动配置 MAC 地址白名单**。以下是常见型号的配置方法：
+
+### 方法一：Web 界面配置 (推荐)
+1. 登录华为路由器 Web 管理界面 (通常 `192.168.3.1` 或 `192.168.1.1`)
+2. 找到 "Wi-Fi 设置" / "无线设置" / "访客网络" / "MAC 过滤"
+3. 添加允许的设备 MAC 地址
+4. 保存配置
+
+### 方法二：命令行配置 (SSH)
+```bash
+# 登录路由器 SSH
+ssh admin@192.168.3.1
+
+# 进入系统视图
+system-view
+
+# 添加 MAC 地址到白名单 (示例，具体命令因型号而异)
+wlan mac-filter permit xx:xx:xx:xx:xx:xx
+
+# 或使用 ACL
+acl number 4000
+ rule 5 permit source-mac xxxx-xxxx-xxxx
+```
+
+### 方法三：导出 CSV 批量导入
+1. 在管理后台点击 "导出白名单 CSV"
+2. 登录华为 AC/NCE 控制器
+3. 批量导入 MAC 地址白名单
+
+## 🔧 高级配置
+
+### 修改端口
+编辑 `app.py`，修改最后一行：
+```python
+app.run(host='0.0.0.0', port=8080, debug=True)
+```
+
+### 生产环境部署
+建议使用 Gunicorn 或 uWSGI：
+```bash
+pip install gunicorn
+gunicorn -w 4 -b 0.0.0.0:8080 app:app
+```
+
+### 配合 Captive Portal
+如果使用华为路由器的强制门户 (Captive Portal) 功能：
+1. 在路由器上配置认证 URL 为 `http://<服务器IP>:8080`
+2. 配置重定向规则，未认证用户强制跳转到认证页
+3. 认证成功后，路由器根据 MAC 白名单放行
+
+## 📝 注意事项
+
+1. **MAC 地址获取**: 由于浏览器安全限制，网页无法直接获取客户端真实 MAC 地址。实际部署时，需要通过以下方式之一获取：
+   - 华为路由器在重定向时注入 MAC 地址参数
+   - 从路由器日志/ARP 表中查询
+   - 使用 DHCP Snooping 功能
+
+2. **安全性**: 
+   - 生产环境请修改 `app.secret_key`
+   - 建议启用 HTTPS
+   - 密码目前为明文存储，生产环境请使用哈希加密
+
+3. **数据库**: 当前使用 SQLite，高并发场景建议改用 MySQL/PostgreSQL
+
+## 🆘 常见问题
+
+**Q: 用户登录后为什么还不能上网？**
+A: 本程序仅负责认证和记录，需要管理员手动在华为路由器上将用户 MAC 加入白名单后才能上网。
+
+**Q: 如何获取用户的真实 MAC 地址？**
+A: 查看华为路由器的 ARP 表或 DHCP 租约列表，根据 IP 地址对应查找 MAC 地址。
+
+**Q: 支持哪些华为设备？**
+A: 所有支持 MAC 地址白名单功能的华为路由器/AC 控制器均可，包括 AR 系列、AC6005、NCE-Campus 等。
+
+## 📄 License
+
+MIT License
