@@ -9,6 +9,8 @@ import re
 import platform
 import threading
 import time
+import sys
+import ctypes
 
 app = Flask(__name__)
 app.secret_key = 'wifi_auth_secret_key_change_this_in_prod'
@@ -20,6 +22,38 @@ JSON_PATH = 'users.json'
 SYSTEM_OS = platform.system()
 HOTSPOT_INTERFACE = None
 HOTSPOT_SUBNET = "192.168.137."  # Windows 默认热点网段
+
+# =================管理员权限提升逻辑=================
+def is_admin():
+    """检查是否以管理员身份运行"""
+    try:
+        return os.getuid() == 0
+    except AttributeError:
+        # Windows 方法
+        try:
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        except:
+            return False
+
+def run_as_admin():
+    """以管理员身份重启当前脚本"""
+    script = os.path.abspath(sys.argv[0])
+    params = ' '.join([script] + sys.argv[1:])
+    
+    ret = ctypes.windll.shell32.ShellExecuteW(
+        None, 
+        "runas", 
+        sys.executable, 
+        params, 
+        None, 
+        1  # SW_SHOWNORMAL
+    )
+    
+    if ret <= 32:
+        print("错误：无法请求管理员权限，请手动右键以管理员身份运行。")
+        sys.exit(1)
+    
+    sys.exit(0)
 
 def get_hotspot_interface():
     """获取热点网络接口名称"""
@@ -459,6 +493,22 @@ def admin_logout():
     return redirect(url_for('admin'))
 
 if __name__ == '__main__':
+    # 1. 检查管理员权限 (仅 Windows)
+    if SYSTEM_OS == "Windows" and not is_admin():
+        print("⚠️  检测到非管理员模式，正在请求提权...")
+        run_as_admin()
+    
+    # 2. 初始化数据
     init_data()
+    
+    # 3. 启动防火墙监控线程
+    t = threading.Thread(target=firewall_monitor_thread, daemon=True)
+    t.start()
+    
+    # 4. 启动 Web 服务器
+    print(f"✅ 服务已启动 (管理员模式：{is_admin()})")
+    print(f"📡 热点网关地址：http://{HOTSPOT_SUBNET}1:8080")
+    print(f"🛡️  防火墙规则同步中...")
+    
     # host='0.0.0.0' 允许局域网访问，debug=False 避免 reloader 导致端口占用
-    app.run(host='0.0.0.0', port=8080, debug=False)
+    app.run(host='0.0.0.0', port=8080, debug=False, threaded=True)
